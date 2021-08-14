@@ -1,0 +1,22 @@
+{
+  "name": "plugin-device-monitoring",
+  "version": "0.0.1",
+  "description": "A Twilio Flex plugin for monitoring call quality and errors",
+  "private": true,
+  "scripts": {
+    "postinstall": "flex-plugin pre-script-check"
+  },
+  "dependencies": {
+    "dotenv-webpack": "^7.0.3",
+    "flex-plugin-scripts": "^4.5.0-beta.0",
+    "jlafer-flex-util": "0.0.10",
+    "ramda": "^0.27.1",
+    "react": "16.5.2",
+    "react-dom": "16.5.2",
+    "twilio-sync": "^2.0.1"
+  },
+  "devDependencies": {
+    "@twilio/flex-ui": "^1.27.0",
+    "react-test-renderer": "16.5.2"
+  }
+}
