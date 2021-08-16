@@ -1,3 +1,4 @@
+//TODO add in configuration once stable
 var appConfig = {
   pluginService: {
     enabled: true,

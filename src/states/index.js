@@ -3,7 +3,7 @@ import { combineReducers } from 'redux';
 import {
   SET_CURRENT_TASK, SET_SERVERLESS_URI, SET_SYNC_CLIENT,
   SET_MY_PAGE_STATE,
-  ADD_VOICE_WARNING_STATE, REMOVE_VOICE_WARNING_STATE
+  ADD_CALL, REMOVE_CALL, ADD_VOICE_WARNING_STATE, REMOVE_VOICE_WARNING_STATE
 } from './actions';
 import appStateReducer from "./AppState";
 import pageStateReducer from "./PageState";
@@ -31,6 +31,14 @@ export const setCurrentTask = (payload) => ({
 // a sample Redux action creator
 export const setMyPageState = (payload) => ({
   type: SET_MY_PAGE_STATE, payload
+});
+
+export const addCall = (callSid, startTS) => ({
+  type: ADD_CALL, payload: {callSid, startTS}
+});
+
+export const removeCall = (callSid, endTS) => ({
+  type: REMOVE_CALL, payload: {callSid, endTS}
 });
 
 export const addVoiceWarningState = (payload) => ({

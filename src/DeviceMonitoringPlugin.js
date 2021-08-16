@@ -85,7 +85,7 @@ export default class DeviceMonitoringPlugin extends FlexPlugin {
       mkUpdateTokenInSyncClient(getSyncToken, syncClient, 'Flex token updated')
     );
 
-    voiceClient.on('incoming', voiceConnectedHandler(manager));
+    voiceClient.on('incoming', voiceConnectedHandler(manager, config));
     voiceClient.on('error', (twilioError, call) => {
       console.log('----------------------an error has occurred:', twilioError);
       console.log('------------------------on call:', call);
