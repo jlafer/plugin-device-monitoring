@@ -1,7 +1,7 @@
 import { combineReducers } from 'redux';
 
 import {
-  SET_CURRENT_TASK, SET_SERVERLESS_URI, SET_SYNC_CLIENT,
+  SET_CURRENT_TASK, SET_EXECUTION_CONTEXT, SET_SYNC_CLIENT,
   SET_MY_PAGE_STATE,
   ADD_CALL, REMOVE_CALL, ADD_VOICE_WARNING_STATE, REMOVE_VOICE_WARNING_STATE
 } from './actions';
@@ -16,8 +16,8 @@ export default combineReducers({
   appState: appStateReducer
 });
 
-export const setServerlessUri = (payload) => ({
-  type: SET_SERVERLESS_URI, payload
+export const setExecutionContext = (payload) => ({
+  type: SET_EXECUTION_CONTEXT, payload
 });
 
 export const setSyncClient = (payload) => ({

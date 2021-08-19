@@ -34,7 +34,8 @@ The `DeviceMonitoringPlugin` namespace within the `attributes` property of the F
     highRttThreshold: [mSecs],
     highPacketsLostThreshold: [pct],
     lowMosThreshold: [number],
-    highJitterThreshold: [mSecs]
+    highJitterThreshold: [mSecs],
+    shortCallThreshold: [secs]
   }
 ```
 
@@ -47,6 +48,12 @@ The `highPacketsLostThreshold` property is used to set a limit on packets lost, 
 The `lowMosThreshold` property is used to set a lower limit on MOS scores before the poor voice quality condition is triggered. The default value is `6`.
 
 The `highJitterThreshold` property is used to set a limit on jitter, in milli-seconds, before the poor voice quality condition is triggered. The default value is `30`.
+
+The `shortCallThreshold` property is used to set a lower limit on call duration, in seconds, before the poor voice quality condition is triggered. Generally, a "short call" is indicative of a poor-quality voice connection that prompted either the customer or the agent to hang up quickly. Setting the value to zero will effectively disable this condition from triggering an alert. The default value is `10`.
+
+The `endedInWarningIsTrigger` boolean property indicates whether a call ending while a warning condition is in progress should warrant an alert. The default value is `false`.
+
+The `warningDurPctThreshold` property is used to set an upper limit on the percentage of time that a call is under a warning condition before it warrants an alert. The default value is `15`.
 
 See `appConfig.example.js` for sample configuration data. For local development, use `appConfig.js` to configure the plugin. For a Twilio-hosted deployment, update the Flex configuration using the Flex API as described [here](https://www.twilio.com/docs/flex/ui/configuration#modifying-configuration-for-flextwiliocom). Here's an example of calling the API via `curl` that can be used IF NO OTHER PLUGINS ARE CONFIGURED in the `attributes` property. As described in the document linked above, other plugins' configuration data can be preserved by first GETting the `attributes` data, editing the result to add in the `DeviceMonitoringPlugin` key, and then POSTing back the edited result.
 

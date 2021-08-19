@@ -8,7 +8,7 @@ import {getPluginConfiguration} from 'jlafer-flex-util';
 import MyPage from "./components/MyPage/MyPageContainer";
 import SidebarMyButton from './components/SidebarMyButton/SidebarMyButton';
 import reducers, {
-  namespace, setCurrentTask, setServerlessUri, setSyncClient
+  namespace, setCurrentTask, setExecutionContext, setSyncClient
 } from './states';
 import {verifyAndFillConfiguration} from './configHelpers';
 import {mkGetSyncToken, mkUpdateTokenInSyncClient} from './syncHelpers';
@@ -44,17 +44,15 @@ export default class DeviceMonitoringPlugin extends FlexPlugin {
 
   async init(flex, manager) {
     console.log(`${PLUGIN_NAME}: initializing in Flex ${Flex.VERSION} instance`);
-    const {store, serviceConfiguration, voiceClient} = manager;
+    const {store, voiceClient} = manager;
     const rawConfig = getPluginConfiguration(manager, PLUGIN_NAME);
     const config = verifyAndFillConfiguration(rawConfig);
     store.addReducer(namespace, reducers);
     const serverlessUri = process.env.REACT_APP_SERVERLESS_URI;
     console.log(`${PLUGIN_NAME}: serverless uri = ${serverlessUri}`);
-    store.dispatch( setServerlessUri(serverlessUri) );
+    store.dispatch( setExecutionContext({serverlessUri, config}) );
 
-    const {ui_attributes} = serviceConfiguration;
-    const {colorTheme, language} = ui_attributes;
-    console.log(`${PLUGIN_NAME}: configuration:`, serviceConfiguration);
+    console.log(`${PLUGIN_NAME}: configuration:`, config);
 
     flex.Actions.addListener("afterCompleteTask", afterCompleteTask(manager));
 
@@ -70,6 +68,19 @@ export default class DeviceMonitoringPlugin extends FlexPlugin {
       </Flex.View>
     );
 
+    manager.strings.voiceAlert = 'Possible voice network quality issue detected: {{issuesStr}}';
+    flex.Notifications.registerNotification({
+      id: 'VoiceWarning',
+      content: 'voiceAlert',
+      type: flex.NotificationType.warning
+    });
+
+    voiceClient.on('incoming', voiceConnectedHandler(manager, config));
+    voiceClient.on('error', (twilioError, call) => {
+      console.log('----------------------an error has occurred:', twilioError);
+      console.log('------------------------on call:', call);
+    });
+
     // get a Sync client for using Twilio Sync objects
     // NOTE: moving this code above the component additions above caused those
     //   components to not render???
@@ -84,11 +95,5 @@ export default class DeviceMonitoringPlugin extends FlexPlugin {
       "tokenUpdated",
       mkUpdateTokenInSyncClient(getSyncToken, syncClient, 'Flex token updated')
     );
-
-    voiceClient.on('incoming', voiceConnectedHandler(manager, config));
-    voiceClient.on('error', (twilioError, call) => {
-      console.log('----------------------an error has occurred:', twilioError);
-      console.log('------------------------on call:', call);
-    });
   }
 }

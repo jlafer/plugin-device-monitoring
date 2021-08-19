@@ -1,13 +1,16 @@
 import * as R from 'ramda';
 import {
-  SET_SERVERLESS_URI, SET_CURRENT_TASK, SET_SYNC_CLIENT,
+  SET_EXECUTION_CONTEXT, SET_CURRENT_TASK, SET_SYNC_CLIENT,
   ADD_CALL, REMOVE_CALL,
   ADD_VOICE_WARNING_STATE, REMOVE_VOICE_WARNING_STATE
 } from './actions';
+import {isWarningInProgress} from '../voiceHelpers';
 
 const initialState = {
   callsCnt: 0,
   callsWithWarningCnt: 0,
+  shortCallsCnt: 0,
+  callsWithErrorCnt: 0,
   totalVoiceWarningStatesDur: 0,
   calls: {},
   currentTask: null,
@@ -25,8 +28,8 @@ export default function reduce(state = initialState, action) {
       return removeCall(state, action.payload);
     case REMOVE_VOICE_WARNING_STATE:
       return removeVoiceWarningState(state, action.payload);
-    case SET_SERVERLESS_URI:
-      return {...state, serverlessUri: action.payload};
+    case SET_EXECUTION_CONTEXT:
+      return R.mergeRight(state, action.payload);
     case SET_CURRENT_TASK:
       return {...state, currentTask: action.payload};
     case SET_SYNC_CLIENT:
@@ -44,18 +47,10 @@ const addCall = (state, payload) => {
   return {...state, callsCnt, calls};
 };
 
-/*
-  call {
-    startTS: number,
-    warningStartTS: number,
-    currWarningStates: {}
-    voiceWarningStatesDur: number
-  }
-*/
-
 const initiateCall = (startTS) => {
   return {
-    startTS, warnStartTS: null, currWarningStates: {}, voiceWarningStatesDur: 0
+    startTS, warnStartTS: null, currWarningStates: {}, voiceWarningStatesDur: 0,
+    errorCondition: null
   };
 };
 
@@ -66,22 +61,28 @@ const removeCall = (state, payload) => {
     console.warn('removeCall: call not found in state???', payload);
     return state;
   }
-  const {startTS, warnStartTS, currWarningStates, voiceWarningStatesDur} = call;
-  const callDur = endTS - startTS;
-  const shortCall = (callDur < 20000);
-  const shortCallsCnt = shortCall ? state.shortCallsCnt + 1 : state.shortCallsCnt;
+  const {startTS, warnStartTS, currWarningStates} = call;
+  call.endTS = endTS;
+  call.duration = endTS - startTS;
+  call.shortCall = (call.duration < state.config.shortCallThreshold);
+  const shortCallsCnt = call.shortCall ? state.shortCallsCnt + 1 : state.shortCallsCnt;
   const warningInProgress = isWarningInProgress(currWarningStates);
+  if (warningInProgress) {
+    call.voiceWarningStatesDur += (endTS - warnStartTS);
+  }
   const callsWithWarningCnt = (call.voiceWarningStatesDur > 0)
     ? state.callsWithWarningCnt + 1 : state.callsWithWarningCnt;
-  const finalWarningStatesDur = warningInProgress
-    ? voiceWarningStatesDur + (endTS - warnStartTS) : voiceWarningStatesDur;
+  const callsWithErrorCnt = (call.errorCondition)
+    ? state.callsWithErrorCnt + 1 : state.callsWithErrorCnt;
   return {
     ...state,
     calls: R.dissoc(callSid, state.calls),
     callsCnt: state.callsCnt + 1,
     callsWithWarningCnt,
+    callsWithErrorCnt,
     shortCallsCnt,
-    totalVoiceWarningStatesDur: state.totalVoiceWarningStatesDur + finalWarningStatesDur
+    totalVoiceWarningStatesDur: state.totalVoiceWarningStatesDur + call.voiceWarningStatesDur,
+    latestCall: call
   };
 };
 
@@ -96,10 +97,17 @@ const addVoiceWarningState = (state, payload) => {
   if ( !thresholdTriggered(config, state, warningName, warningData) )
     return state;
   const warnStartTS = (warningInProgress) ? call.warnStartTS : ts;
+
+  // ice-connectivity-lost seems to reliably result in a dropped call
+  // there may be other warnings that do also
+  const errorCondition = (warningName === 'ice-connectivity-lost')
+    ? warningName : state.errorCondition;
+
   const callUpdate = {
     ...call,
     currWarningStates: R.assoc(warningName, warningData, call.currWarningStates),
-    warnStartTS
+    warnStartTS,
+    errorCondition
   };
   const calls = R.assoc(callSid, callUpdate, state.calls);
   return {...state, calls};
@@ -123,20 +131,60 @@ const removeVoiceWarningState = (state, payload) => {
   const voiceWarningStatesDur = warningInProgress
     ? call.voiceWarningStatesDur : call.voiceWarningStatesDur + (ts - warnStartTS);
   const newWarnStartTS = warningInProgress ? warnStartTS : null;
+  const errorCondition = (warningName === 'ice-connectivity-lost')
+    ? null : state.errorCondition;
   const callUpdate = {
     ...call,
     currWarningStates: newWarningStates,
     voiceWarningStatesDur,
-    warnStartTS: newWarnStartTS
+    warnStartTS: newWarnStartTS,
+    errorCondition
   };
   const calls = R.assoc(callSid, callUpdate, state.calls);
   return {...state, calls};
 };
 
 const thresholdTriggered = (config, state, warningName, warningData) => {
-  return true;
+  const thresholdActive = R.includes(warningName, [
+    'high-packet-loss',
+    'high-packets-lost-fraction',
+    'high-jitter',
+    'high-rtt',
+    'low-mos'
+  ]);
+  if ( !thresholdActive )
+    return true;
+  const {threshold, values} = warningData;
+  const value = calcValue(threshold, values);
+  switch (warningName) {
+    case 'high-packet-loss':
+    case 'high-packets-lost-fraction':
+      return (value > config.highPacketsLostThreshold);
+    case 'high-jitter':
+      return (value > config.highJitterThreshold);
+    case 'high-rtt':
+      return (value > config.highRttThreshold);
+    case 'low-mos':
+      return (value < config.lowMosThreshold);
+  }
 };
 
-const isWarningInProgress = (warningStates) => {
-  return R.keys(warningStates).length > 0;
+const calcValue = (threshold, values) => {
+  switch (threshold.name) {
+    case 'maxAverage':
+      return R.sum(values) / values.length;
+    case 'max':
+      return R.reduce(
+        (accum, elem) => (elem > accum) ? elem : accum,
+        0, values
+      );
+    case 'min':
+      return R.reduce(
+        (accum, elem) => (elem < accum) ? elem : accum,
+        999, values
+      );
+    default:
+      console.log(`+++++++++++++++++++++ got threshold type = ${threshold.name}`);
+      return 0;
+  }
 };

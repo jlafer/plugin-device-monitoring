@@ -1,5 +1,6 @@
 import * as R from 'ramda';
-import {addCall, removeCall, addVoiceWarningState, removeVoiceWarningState} from './states';
+import {Notifications} from '@twilio/flex-ui';
+import {namespace, addCall, removeCall, addVoiceWarningState, removeVoiceWarningState} from './states';
 
 export const voiceConnectedHandler = R.curry((manager, config, connection) => {
   console.log('----------------------connected');
@@ -34,5 +35,52 @@ export const voiceConnectedHandler = R.curry((manager, config, connection) => {
     const ts = Date.now();
     const {store} = manager;
     store.dispatch( removeCall(CallSid, ts) );
+
+    const {latestCall} = store.getState()[namespace].appState;
+    const voiceIssues = callWarrantsResponse(config, latestCall);
+    console.log('-----------------voiceIssues', voiceIssues);
+    if ( voiceIssues.respond ) {
+      console.log('-----------------call meets issue threshold', latestCall);
+      console.log('  issues:', voiceIssues);
+      respondToIssue(config, manager, latestCall, voiceIssues);
+    }
   });  
 });
+
+const callWarrantsResponse = (config, call) => {
+  const issues = [];
+  const {shortCall, duration, voiceWarningStatesDur, currWarningStates} = call;
+  console.log(`----------------------the config`, config);
+  console.log(`----------------------the call`, call);
+  if (shortCall) {
+    issues.push({reason: 'short call', duration, threshold: config.shortCallThreshold});
+  }
+  const warningInProgress = isWarningInProgress(currWarningStates);
+  if (warningInProgress && config.endedInWarningIsTrigger) {
+    const warnings = R.keys(currWarningStates).join(', ');
+    issues.push({reason: 'call ended under warning', duration, warnings});
+  }
+  const warningDurPct = (duration > 0) ? (voiceWarningStatesDur / duration) : 0;
+  if (warningDurPct > config.warningDurPctThreshold) {
+    issues.push({reason: 'call warning condition pct', duration, warningDurPct, threshold: config.warningDurPctThreshold});
+  }
+  const respond = (issues.length > 0);
+  return {respond, issues};
+};
+
+const respondToIssue = (config, manager, latestCall, voiceIssues) => {
+  const issuesStr = R.map(R.prop('reason'), voiceIssues.issues).join(', ');
+  console.log(`----------------------this is me responding`);
+  if (config.alertAgent) {
+    alertAgent(issuesStr);
+  }
+};
+
+const alertAgent = (issuesStr) => {
+  console.log(`---------------------- issuesStr: ${issuesStr}`);
+  Notifications.showNotification("VoiceWarning", {issuesStr});
+};
+
+export const isWarningInProgress = (warningStates) => {
+  return R.keys(warningStates).length > 0;
+};
