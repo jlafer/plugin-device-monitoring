@@ -2,6 +2,7 @@ export function verifyAndFillConfiguration(cfg) {
   const pluginName = 'DeviceMonitoringPlugin';
   if (! cfg)
     throw new Error(`${pluginName}: attributes.${pluginName} NOT configured. See README for instructions.`);
+  const action = !!cfg.action ? cfg.action : 'log-call';
   const alertAgent = !!cfg.alertAgent ? cfg.alertAgent : false;
   const highRttThreshold = !!cfg.highRttThreshold ? cfg.highRttThreshold : 400;
   const highPacketsLostThreshold = !!cfg.highPacketsLostThreshold ? cfg.highPacketsLostThreshold : 3;
@@ -11,7 +12,7 @@ export function verifyAndFillConfiguration(cfg) {
   const endedInWarningIsTrigger = !!cfg.endedInWarningIsTrigger ? cfg.endedInWarningIsTrigger : false;
   const warningDurPctThreshold = !!cfg.warningDurPctThreshold ? cfg.warningDurPctThreshold : 15;
   return {
-    alertAgent, highRttThreshold, highPacketsLostThreshold, lowMosThreshold, highJitterThreshold,
+    alertAgent, action, highRttThreshold, highPacketsLostThreshold, lowMosThreshold, highJitterThreshold,
     shortCallThreshold, endedInWarningIsTrigger, warningDurPctThreshold
   };
 }

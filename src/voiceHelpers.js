@@ -1,14 +1,25 @@
 import * as R from 'ramda';
-import {Notifications} from '@twilio/flex-ui';
-import {namespace, addCall, removeCall, addVoiceWarningState, removeVoiceWarningState} from './states';
+import {Notifications, Manager} from '@twilio/flex-ui';
+//import {callApiFormEncoded} from 'jlafer-flex-util';
+import {setBaseOptions, addFlexToken, setEncoding, callApi} from 'jlafer-flex-util';
+import {
+  namespace, addCall, removeCall, addVoiceWarningState, removeVoiceWarningState
+} from './states';
+
+const configureApi = R.pipe(
+  setBaseOptions,
+  addFlexToken(Manager.getInstance()),
+  setEncoding('form')
+);
+const myApiOptions = configureApi();
 
 export const voiceConnectedHandler = R.curry((manager, config, connection) => {
-  console.log('----------------------connected');
+  console.log('----------------------connected:', connection);
   const {parameters} = connection;
-  const {CallSid} = parameters;
-  const ts = Date.now();
+  const {CallSid: callSid, From: dnis} = parameters;
+  const startTS = Date.now();
   const {store} = manager;
-  store.dispatch( addCall(CallSid, ts) );
+  store.dispatch( addCall({callSid, dnis, startTS}) );
 
   connection.on('warning', (warningName, warningData) => {
     console.log(`----------------------a ${warningName} warning has been generated:`, warningData);
@@ -50,8 +61,6 @@ export const voiceConnectedHandler = R.curry((manager, config, connection) => {
 const callWarrantsResponse = (config, call) => {
   const issues = [];
   const {shortCall, duration, voiceWarningStatesDur, currWarningStates} = call;
-  console.log(`----------------------the config`, config);
-  console.log(`----------------------the call`, call);
   if (shortCall) {
     issues.push({reason: 'short call', duration, threshold: config.shortCallThreshold});
   }
@@ -64,16 +73,22 @@ const callWarrantsResponse = (config, call) => {
   if (warningDurPct > config.warningDurPctThreshold) {
     issues.push({reason: 'call warning condition pct', duration, warningDurPct, threshold: config.warningDurPctThreshold});
   }
-  const respond = (issues.length > 0);
-  return {respond, issues};
+  // TODO
+  //const respond = (issues.length > 0);
+  //return {respond, issues};
+  return {respond: true, issues: [{reason: 'call was lousy'}]};
 };
 
 const respondToIssue = (config, manager, latestCall, voiceIssues) => {
   const issuesStr = R.map(R.prop('reason'), voiceIssues.issues).join(', ');
+  const {callerId, dnis} = latestCall;
   console.log(`----------------------this is me responding`);
   if (config.alertAgent) {
     alertAgent(issuesStr);
   }
+  const {serverlessUri} = manager.store.getState()[namespace].appState;
+  const url = `${serverlessUri}/respond-to-issue`;
+  callApi(myApiOptions, url, 'post', {issues: issuesStr, callerId, dnis, action: config.action});
 };
 
 const alertAgent = (issuesStr) => {

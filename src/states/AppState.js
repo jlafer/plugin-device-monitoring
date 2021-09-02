@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 import {
-  SET_EXECUTION_CONTEXT, SET_CURRENT_TASK, SET_SYNC_CLIENT,
+  SET_EXECUTION_CONTEXT, SET_SYNC_CLIENT,
   ADD_CALL, REMOVE_CALL,
   ADD_VOICE_WARNING_STATE, REMOVE_VOICE_WARNING_STATE
 } from './actions';
@@ -13,7 +13,6 @@ const initialState = {
   callsWithErrorCnt: 0,
   totalVoiceWarningStatesDur: 0,
   calls: {},
-  currentTask: null,
   serverlessUri: null,
   syncClient: null
 };
@@ -30,8 +29,6 @@ export default function reduce(state = initialState, action) {
       return removeVoiceWarningState(state, action.payload);
     case SET_EXECUTION_CONTEXT:
       return R.mergeRight(state, action.payload);
-    case SET_CURRENT_TASK:
-      return {...state, currentTask: action.payload};
     case SET_SYNC_CLIENT:
       return {...state, syncClient: action.payload};
     default:
@@ -40,16 +37,18 @@ export default function reduce(state = initialState, action) {
 }
 
 const addCall = (state, payload) => {
-  const {callSid, startTS} = payload;
+  const {callSid, dnis, startTS} = payload;
   const callsCnt = state.callsCnt + 1;
-  const call = initiateCall(startTS);
+  //TODO
+  const callerId = '+12088747271'
+  const call = initiateCall(dnis, callerId, startTS);
   const calls = R.assoc(callSid, call, state.calls);
   return {...state, callsCnt, calls};
 };
 
-const initiateCall = (startTS) => {
+const initiateCall = (dnis, callerId, startTS) => {
   return {
-    startTS, warnStartTS: null, currWarningStates: {}, voiceWarningStatesDur: 0,
+    dnis, callerId, startTS, warnStartTS: null, currWarningStates: {}, voiceWarningStatesDur: 0,
     errorCondition: null
   };
 };
