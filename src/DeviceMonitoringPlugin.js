@@ -1,14 +1,25 @@
+import * as R from 'ramda';
 import * as Flex from '@twilio/flex-ui';
 import { FlexPlugin } from 'flex-plugin';
 import {getPluginConfiguration} from 'jlafer-flex-util';
 
 import reducers, {
-  namespace, setExecutionContext
+  namespace, setExecutionContext, setLatestCaller
 } from './states';
 import {verifyAndFillConfiguration} from './configHelpers';
 import {voiceConnectedHandler} from './voiceHelpers';
 
 const PLUGIN_NAME = 'DeviceMonitoringPlugin';
+
+const afterAcceptTask = R.curry((manager, payload) => {
+  const {store} = manager;
+  const {dispatch} = store;
+  const {task} = payload;
+  const {taskChannelUniqueName, attributes} = task;
+  if (taskChannelUniqueName   === 'voice') {
+    dispatch( setLatestCaller(attributes.from) );
+  };
+});
 
 export default class DeviceMonitoringPlugin extends FlexPlugin {
   constructor() {
@@ -34,10 +45,12 @@ export default class DeviceMonitoringPlugin extends FlexPlugin {
       type: flex.NotificationType.warning
     });
 
+    flex.Actions.addListener("afterAcceptTask", afterAcceptTask(manager));
+
     voiceClient.on('incoming', voiceConnectedHandler(manager, config));
     voiceClient.on('error', (twilioError, call) => {
-      console.log('----------------------an error has occurred:', twilioError);
-      console.log('------------------------on call:', call);
+      console.log(`${PLUGIN_NAME}: an error has occurred:`, twilioError);
+      console.log(`${PLUGIN_NAME}: on call:`, call);
     });
   }
 }

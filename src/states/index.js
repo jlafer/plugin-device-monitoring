@@ -1,7 +1,7 @@
 import { combineReducers } from 'redux';
 
 import {
-  SET_EXECUTION_CONTEXT, SET_SYNC_CLIENT,
+  SET_EXECUTION_CONTEXT, SET_SYNC_CLIENT, SET_LATEST_CALLER,
   ADD_CALL, REMOVE_CALL, ADD_VOICE_WARNING_STATE, REMOVE_VOICE_WARNING_STATE
 } from './actions';
 import appStateReducer from "./AppState";
@@ -18,6 +18,10 @@ export const setExecutionContext = (payload) => ({
 
 export const setSyncClient = (payload) => ({
   type: SET_SYNC_CLIENT, payload
+});
+
+export const setLatestCaller = (from) => ({
+  type: SET_LATEST_CALLER, payload: {caller: from}
 });
 
 export const addCall = (payload) => ({

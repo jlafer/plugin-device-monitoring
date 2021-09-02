@@ -14,7 +14,7 @@ const configureApi = R.pipe(
 const myApiOptions = configureApi();
 
 export const voiceConnectedHandler = R.curry((manager, config, connection) => {
-  console.log('----------------------connected:', connection);
+  //console.log('----------------------connected:', connection);
   const {parameters} = connection;
   const {CallSid: callSid, From: dnis} = parameters;
   const startTS = Date.now();
@@ -22,7 +22,7 @@ export const voiceConnectedHandler = R.curry((manager, config, connection) => {
   store.dispatch( addCall({callSid, dnis, startTS}) );
 
   connection.on('warning', (warningName, warningData) => {
-    console.log(`----------------------a ${warningName} warning has been generated:`, warningData);
+    //console.log(`----------------------a ${warningName} warning has been generated:`, warningData);
     const {parameters} = connection;
     const {CallSid: callSid} = parameters;
     const ts = Date.now();
@@ -31,7 +31,7 @@ export const voiceConnectedHandler = R.curry((manager, config, connection) => {
     store.dispatch( addVoiceWarningState(payload) );
   });
   connection.on('warning-cleared', (warningName) => {
-    console.log(`----------------------the ${warningName} warning has cleared`);
+    //console.log(`----------------------the ${warningName} warning has cleared`);
     const {parameters} = connection;
     const {CallSid: callSid} = parameters;
     const {store} = manager;
@@ -40,20 +40,20 @@ export const voiceConnectedHandler = R.curry((manager, config, connection) => {
     store.dispatch( removeVoiceWarningState(payload) );
   });  
   connection.on('disconnect', (disConnection) => {
-    console.log(`----------------------the call disconnected`, disConnection);
+    //console.log(`----------------------the call disconnected`, disConnection);
     const {parameters} = disConnection;
     const {CallSid} = parameters;
     const ts = Date.now();
     const {store} = manager;
     store.dispatch( removeCall(CallSid, ts) );
 
-    const {latestCall} = store.getState()[namespace].appState;
+    const {latestCall, latestCaller} = store.getState()[namespace].appState;
     const voiceIssues = callWarrantsResponse(config, latestCall);
-    console.log('-----------------voiceIssues', voiceIssues);
+    //console.log('-----------------voiceIssues', voiceIssues);
     if ( voiceIssues.respond ) {
-      console.log('-----------------call meets issue threshold', latestCall);
-      console.log('  issues:', voiceIssues);
-      respondToIssue(config, manager, latestCall, voiceIssues);
+      //console.log('-----------------call meets issue threshold', latestCall);
+      //console.log('  issues:', voiceIssues);
+      respondToIssue(config, manager, latestCall, latestCaller, voiceIssues);
     }
   });  
 });
@@ -62,37 +62,42 @@ const callWarrantsResponse = (config, call) => {
   const issues = [];
   const {shortCall, duration, voiceWarningStatesDur, currWarningStates} = call;
   if (shortCall) {
-    issues.push({reason: 'short call', duration, threshold: config.shortCallThreshold});
+    issues.push({
+      reason: 'short call',
+      duration, threshold: config.shortCallThreshold
+    });
   }
   const warningInProgress = isWarningInProgress(currWarningStates);
   if (warningInProgress && config.endedInWarningIsTrigger) {
     const warnings = R.keys(currWarningStates).join(', ');
-    issues.push({reason: 'call ended under warning', duration, warnings});
+    issues.push({
+      reason: 'call ended under warning',
+      duration, warnings
+    });
   }
   const warningDurPct = (duration > 0) ? (voiceWarningStatesDur / duration) : 0;
   if (warningDurPct > config.warningDurPctThreshold) {
-    issues.push({reason: 'call warning condition pct', duration, warningDurPct, threshold: config.warningDurPctThreshold});
+    issues.push({
+      reason: 'call warning condition pct',
+      duration, warningDurPct, threshold: config.warningDurPctThreshold
+    });
   }
-  // TODO
-  //const respond = (issues.length > 0);
-  //return {respond, issues};
-  return {respond: true, issues: [{reason: 'call was lousy'}]};
+  const respond = (issues.length > 0);
+  return {respond, issues};
 };
 
-const respondToIssue = (config, manager, latestCall, voiceIssues) => {
+const respondToIssue = (config, manager, latestCall, latestCaller, voiceIssues) => {
   const issuesStr = R.map(R.prop('reason'), voiceIssues.issues).join(', ');
-  const {callerId, dnis} = latestCall;
-  console.log(`----------------------this is me responding`);
+  const {dnis} = latestCall;
   if (config.alertAgent) {
     alertAgent(issuesStr);
   }
   const {serverlessUri} = manager.store.getState()[namespace].appState;
   const url = `${serverlessUri}/respond-to-issue`;
-  callApi(myApiOptions, url, 'post', {issues: issuesStr, callerId, dnis, action: config.action});
+  callApi(myApiOptions, url, 'post', {issues: issuesStr, callerId: latestCaller, dnis, action: config.action});
 };
 
 const alertAgent = (issuesStr) => {
-  console.log(`---------------------- issuesStr: ${issuesStr}`);
   Notifications.showNotification("VoiceWarning", {issuesStr});
 };
 

@@ -1,6 +1,6 @@
 import * as R from 'ramda';
 import {
-  SET_EXECUTION_CONTEXT, SET_SYNC_CLIENT,
+  SET_EXECUTION_CONTEXT, SET_SYNC_CLIENT, SET_LATEST_CALLER,
   ADD_CALL, REMOVE_CALL,
   ADD_VOICE_WARNING_STATE, REMOVE_VOICE_WARNING_STATE
 } from './actions';
@@ -14,11 +14,14 @@ const initialState = {
   totalVoiceWarningStatesDur: 0,
   calls: {},
   serverlessUri: null,
-  syncClient: null
+  syncClient: null,
+  latestCaller: null
 };
 
 export default function reduce(state = initialState, action) {
   switch (action.type) {
+    case SET_LATEST_CALLER:
+      return {...state, latestCaller: action.payload.caller};
     case ADD_CALL:
       return addCall(state, action.payload);
     case ADD_VOICE_WARNING_STATE:
@@ -39,16 +42,14 @@ export default function reduce(state = initialState, action) {
 const addCall = (state, payload) => {
   const {callSid, dnis, startTS} = payload;
   const callsCnt = state.callsCnt + 1;
-  //TODO
-  const callerId = '+12088747271'
-  const call = initiateCall(dnis, callerId, startTS);
+  const call = initiateCall(dnis, startTS);
   const calls = R.assoc(callSid, call, state.calls);
   return {...state, callsCnt, calls};
 };
 
-const initiateCall = (dnis, callerId, startTS) => {
+const initiateCall = (dnis, startTS) => {
   return {
-    dnis, callerId, startTS, warnStartTS: null, currWarningStates: {}, voiceWarningStatesDur: 0,
+    dnis, startTS, warnStartTS: null, currWarningStates: {}, voiceWarningStatesDur: 0,
     errorCondition: null
   };
 };
@@ -183,7 +184,7 @@ const calcValue = (threshold, values) => {
         999, values
       );
     default:
-      console.log(`+++++++++++++++++++++ got threshold type = ${threshold.name}`);
+      console.warn(`AppState: got unexpected threshold type = ${threshold.name}`);
       return 0;
   }
 };

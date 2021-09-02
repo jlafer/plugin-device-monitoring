@@ -1,4 +1,3 @@
-//TODO add in configuration once stable
 var appConfig = {
   pluginService: {
     enabled: true,
@@ -13,12 +12,7 @@ var appConfig = {
       alertAgent: true,
       action: 'send-sms-to-customer',
       highRttThreshold: 500,
-      highPacketsLostThreshold: 5,
-      lowMosThreshold: 5,
-      highJitterThreshold: 30,
-      shortCallThreshold: 15,
-      endedInWarningIsTrigger: true,
-      warningDurPctThreshold: 10
+      highPacketsLostThreshold: 5
     }
   }
 };
