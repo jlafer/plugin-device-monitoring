@@ -17,20 +17,19 @@ npm install
 ```
 
 ### Serverless
-The `plugin-serverless` sub-folder contains a few Serverless functions.
-
-The `get-sync-token` function provides the client with a Sync token.
+The `plugin-serverless` sub-folder contains a single Serverless function, `respond-to-issue`.
 
 ## Configuration
-The serverless functions depend on a set of environment variables. Those are documented in the module comment-block inside `get-sync-token.js`. A sample environment file, `.env.sample`, is located in the `plugin-device-monitoring-fns` subfolder. It should be copied to `.env` and then edited with the correct values.
+The serverless function depends on two environment variables. A sample environment file, `.env.sample`, is located in the `plugin-serverless` subfolder. It should be copied to `.env` and then edited with the correct values.
 
-Similarly, the client application depends on environment variables during development and testing against the local web server. These variables are also used when the plugin is built and deployed to the Twilio cloud (see below). For this, the project contains a sample environment file, `.env.sample`, in the root folder. Again, it should be copied to `.env` for editing with the correct values. Note that this file provides so-called "React environment variables" whose names must start with the string, `REACT_APP_`.
+Similarly, the client application depends on one environment variable, `REACT_APP_SERVERLESS_URI`. For this, the project contains a sample environment file, `.env.sample`, in the root folder. Again, it should be copied to `.env` for editing with the correct values. The value can be obtaied once the Serverless function has been deploed to the Twilio Serverless platform with the Serverless Toolkit. Note that this file provides so-called "React environment variables" whose names must start with the string, `REACT_APP_`.
 
 The `DeviceMonitoringPlugin` namespace within the `attributes` property of the Flex configuration object is used to configure the plugin. 
 
 ```bash
   DeviceMonitoringPlugin: {
     alertAgent: [true|false],
+    action: [string],
     highRttThreshold: [mSecs],
     highPacketsLostThreshold: [pct],
     lowMosThreshold: [number],
@@ -40,6 +39,8 @@ The `DeviceMonitoringPlugin` namespace within the `attributes` property of the F
 ```
 
 The `alertAgent` boolean property indicates whether the agent should be alerted when a poor voice quality threshold is breached. Threshold levels and conditions can be configured, based on various Voice Insights  warning events. The default value is `false`.
+
+The `action` property is used to specify the server-side action to be taken when a call with a poor voice quality condition is triggered. Currently, only two sample values (i.e., `log-call` and `send-sms-to-customer`) are recognized. The user of this plugin is expected to implement their own actions by enhancing or re-writing the `respond-to-issue` function. The default value is `log-call`.
 
 The `highRttThreshold` property is used to set a limit on WebRTC round-trip times, in milliseconds, before the poor voice quality condition is triggered. The default value is `400`.
 
@@ -64,6 +65,7 @@ curl https://flex-api.twilio.com/v1/Configuration -X POST -u ACxx:auth_token \
         "account_sid": "ACxx",
         "attributes": {
           "DeviceMonitoringPlugin": {
+            "action": "send-sms-to-customer",
             "alertAgent": "true",
             "highRttThreshold": 500
           }
@@ -74,6 +76,13 @@ curl https://flex-api.twilio.com/v1/Configuration -X POST -u ACxx:auth_token \
 Run `twilio flex:plugins --help` to see all the commands currently supported by the Flex Plugins CLI. For further details refer to documentation on the [Flex Plugins CLI docs](https://www.twilio.com/docs/flex/developer/plugins/cli) page.
 
 ## Deploy
+To deploy the function for this plugin, use the Twilio CLI and the Serverless Toolkit plugin while in the `plugin-serverless` folder. First, ensure that the CLI is using the correct Twilio project. You can verify that by running `twilio profiles:list`. The following command will deploy the function to a service in the Twilio Serverless environment:
+```
+twilio serverless:deploy
+```
+
+Use the generated service domain name as the value for `REACT_APP_SERVERLESS_URI` in the appropriate .env file in the parent (plugin) folder.
+
 The plugin can be built and deployed with the `deploy` command of the Flex CLI. To be activated in your Flex project runnning at `flex.twilio.com` you must use the `release` command. This allows you to install this and, optionally, other Flex plugins together. Again, refer to the docs cited above for more information.
 
 ## Disclaimer
